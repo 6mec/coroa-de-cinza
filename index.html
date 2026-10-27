@@ -4107,6 +4107,78 @@ function drawCoop(){MP.ui=1;setMode('menu');const others=Object.values(MP.pl);le
     P.fly=0;P.ride=false;P.boat=p.bo?1:0;P.x=p.x+20;P.y=p.y+10;P.lx=P.x;P.ly=P.y;G.fade=1;G.lastTile=-1;reveal();MP.ui=0;setMode('play');sfx('whoosh')})}
 {const _o=drawOpts;drawOpts=function(){_o();const b=ov.querySelector('.btns');if(b)b.insertAdjacentHTML('beforebegin',`<div class="row2 subrow" style="--sc:#7fd8ff"><div><b>👥 Jogar com amigos</b><small>${MP.on?'Sala '+MP.code+' · '+(Object.keys(MP.pl).length+1)+' jogadores':'Cria uma sala ou entra na de um amigo.'}</small></div><button class="btn sm primary" data-coop="1">Abrir</button></div>`);const c=ov.querySelector('[data-coop]');if(c)c.onclick=()=>drawCoop()}}
 addEventListener('beforeunload',()=>{if(MP.on)mpLeave(true)});
+/* ---------- v33: teclado no computador (ver e mudar teclas) ---------- */
+const KACT=[['up','Andar para cima','KeyW'],['down','Andar para baixo','KeyS'],['left','Andar para a esquerda','KeyA'],['right','Andar para a direita','KeyD'],
+ ['attack','Atacar','KeyJ'],['dodge','Rolar / esquivar','Space'],['skill1','Poder 1','Digit1'],['skill2','Poder 2','Digit2'],['skill3','Poder 3','Digit3'],['ult','Golpe Supremo','KeyU'],
+ ['heal','Beber frasco','KeyH'],['quick','Usar consumível','KeyQ'],['interact','Interagir / falar','KeyE'],['mount','Montar o corcel','KeyR'],['fly','Voar com o grifo','KeyF'],
+ ['map','Mapa','KeyM'],['bag','Mochila','KeyI'],['diary','Diário','KeyL'],['menu','Opções / pausa','Escape']];
+const KDEF=Object.fromEntries(KACT.map(a=>[a[0],a[2]]));
+let KMAP=(()=>{try{return Object.assign({},KDEF,JSON.parse(localStorage.getItem('coroa-keys')||'{}'))}catch(e){return Object.assign({},KDEF)}})();
+const kSave=()=>{try{localStorage.setItem('coroa-keys',JSON.stringify(KMAP))}catch(e){}};
+function kName(c){if(!c)return'—';const N={Space:'Espaço',Escape:'Esc',Enter:'Enter',ArrowUp:'↑',ArrowDown:'↓',ArrowLeft:'←',ArrowRight:'→',ShiftLeft:'Shift',ShiftRight:'Shift dir.',ControlLeft:'Ctrl',ControlRight:'Ctrl dir.',AltLeft:'Alt',Tab:'Tab',Backspace:'Apagar',CapsLock:'Caps'};
+  if(N[c])return N[c];if(c.startsWith('Key'))return c.slice(3);if(c.startsWith('Digit'))return c.slice(5);if(c.startsWith('Numpad'))return 'Num '+c.slice(6);return c}
+let KWAIT=null,KSYN=false;
+function kRemap(e){if(KSYN||e.target&&e.target.tagName==='INPUT')return;
+  if(KWAIT&&e.type==='keydown'){e.preventDefault();e.stopImmediatePropagation();if(e.code!=='Escape'){for(const k in KMAP)if(KMAP[k]===e.code&&k!==KWAIT)KMAP[k]='';KMAP[KWAIT]=e.code;kSave();sfx('click')}KWAIT=null;drawKeys();return}
+  const act=Object.keys(KMAP).find(k=>KMAP[k]===e.code);if(act){const d=KDEF[act];if(d!==e.code){e.preventDefault();e.stopImmediatePropagation();KSYN=true;try{dispatchEvent(new KeyboardEvent(e.type,{code:d,key:d,bubbles:true}))}finally{KSYN=false}}return}
+  // tecla por defeito que foi trocada para outra: desativa
+  const lost=Object.keys(KDEF).find(k=>KDEF[k]===e.code&&KMAP[k]!==e.code);if(lost&&!(e.code==='Escape'&&G.mode!=='play')){e.stopImmediatePropagation();if(e.type==='keyup')keys[e.code]=false}}
+addEventListener('keydown',kRemap,{capture:true});addEventListener('keyup',kRemap,{capture:true});
+function drawKeys(){setMode('menu');const row=([k,n])=>`<div class="row2"><div><b>${n}</b></div><button class="btn sm${KWAIT===k?' primary':''}" data-key="${k}" style="min-width:96px">${KWAIT===k?'Carrega numa tecla…':kName(KMAP[k])}</button></div>`;
+  ov.innerHTML=`<div class="panel"><div class="eyebrow center">Opções</div><h2 class="center">Teclado</h2><div class="rule"><i></i></div>
+   <small>Para jogar no computador. Toca no botão de uma ação e carrega na tecla que queres usar (Esc cancela). As setas do teclado também servem sempre para andar.</small>
+   <h3>Movimento e combate</h3>${KACT.slice(0,12).map(row).join('')}
+   <h3>Outras ações</h3>${KACT.slice(12).map(row).join('')}
+   <div class="btns"><button class="btn" data-kreset="1">Repor teclas</button><button class="btn primary" data-kback="1">Voltar</button></div></div>`;
+  ov.querySelectorAll('[data-key]').forEach(b=>b.onclick=()=>{KWAIT=b.dataset.key;drawKeys()});
+  ov.querySelector('[data-kreset]').onclick=()=>{KMAP=Object.assign({},KDEF);kSave();KWAIT=null;sfx('click');drawKeys()};
+  ov.querySelector('[data-kback]').onclick=()=>{KWAIT=null;drawOpts()}}
+{const _o=drawOpts;drawOpts=function(){_o();const b=ov.querySelector('.btns');if(b)b.insertAdjacentHTML('beforebegin',`<div class="row2 subrow" style="--sc:#e3c06a"><div><b>⌨️ Teclado</b><small>Ver e mudar as teclas para jogar no computador.</small></div><button class="btn sm" data-keys="1">Abrir</button></div>`);const c=ov.querySelector('[data-keys]');if(c)c.onclick=()=>{KWAIT=null;drawKeys()}}}
+/* ajuda no ecrã para quem joga com teclado */
+const KB_DESK=(()=>{try{return matchMedia('(pointer:fine)').matches}catch(e){return false}})();
+function kHelp(){const k=a=>kName(KMAP[a]);return `${k('up')}${k('left')}${k('down')}${k('right')} andar · ${k('attack')} atacar · ${k('dodge')} rolar · ${k('skill1')}/${k('skill2')}/${k('skill3')} poderes · ${k('heal')} frasco · ${k('interact')} interagir · ${k('menu')} opções`}
+{const _st=start;start=function(f){_st(f);if(KB_DESK&&!(S.kbHint>=2)){S.kbHint=(S.kbHint||0)+1;setTimeout(()=>toast('Teclado: '+kHelp(),7,'#e3c06a'),3200)}}}
+{const _h=hud20;hud20=function(){_h();if(!KB_DESK||G.mode!=='play'||CUT||!OPT.khud)return;ctx.save();ctx.textAlign='left';ctx.font='600 11px "Alegreya Sans",sans-serif';ctx.fillStyle='rgba(0,0,0,.55)';const t=kHelp(),w=ctx.measureText(t).width+16;ctx.fillRect(12,VH-28,w,20);ctx.fillStyle='#e8dcc0';ctx.fillText(t,20,VH-14);ctx.restore()}}
+if(OPT.khud===undefined)OPT.khud=KB_DESK;
+{const _o=drawOpts;drawOpts=function(){_o();const b=ov.querySelector('[data-keys]');if(!b)return;b.closest('.row2').insertAdjacentHTML('afterend',`<div class="row2"><div><b>Mostrar teclas no ecrã</b><small>Uma linha em baixo com as teclas principais.</small></div><button class="btn sm" data-khud="1">${OPT.khud?'Ligado':'Desligado'}</button></div>`);ov.querySelector('[data-khud]').onclick=()=>{OPT.khud=!OPT.khud;saveOpt();drawOpts()}}}
+/* ---------- v34: menus práticos (separadores, corpo com scroll, botões sempre visíveis) ---------- */
+{const st=document.createElement('style');st.textContent=`
+#ov.pnxon{overflow:hidden;align-items:center;padding-block:max(8px,env(safe-area-inset-top,0px)) max(8px,env(safe-area-inset-bottom,0px))}
+.panel.pnx{gap:8px;overflow:hidden;padding:14px 14px 0;margin:0}
+.panel.pnx>.eyebrow{margin:0}.panel.pnx>h2{margin:0;font-size:22px}.panel.pnx>.rule{margin:0}
+.pnx-tabs{display:flex;gap:5px;overflow-x:auto;flex:none;padding:2px 0 4px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.pnx-tabs::-webkit-scrollbar{display:none}
+.pnx-tabs button{flex:none;font:inherit;font-size:13px;font-weight:700;padding:8px 12px;border:1px solid var(--line);background:#16120e;color:#c8bca4;border-radius:4px;white-space:nowrap;cursor:pointer}
+.pnx-tabs button.on{color:#1d160a;background:linear-gradient(#f0d48a,#c99a45);border-color:#fff3c4}
+.pnx-body{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:12px;padding:2px 4px 12px 0;overscroll-behavior:contain}
+.pnx-body::-webkit-scrollbar{width:6px}.pnx-body::-webkit-scrollbar-thumb{background:rgba(227,192,106,.35);border-radius:3px}
+.pnx-page{display:flex;flex-direction:column;gap:12px}.pnx-page[hidden]{display:none}
+.pnx-foot{flex:none;margin:0 -14px;padding:10px 14px 12px;border-top:1px solid var(--line);background:rgba(12,11,10,.96)}
+.pnx-foot .btns{margin:0}
+@media (min-width:760px){.panel.pnx{width:min(760px,94vw)}.pnx-page>.row2,.pnx-page>.shoprow{margin:0}
+ .pnx-page.cols{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;align-items:start}.pnx-page.cols>h3,.pnx-page.cols>small,.pnx-page.cols>p,.pnx-page.cols>.detail,.pnx-page.cols>.kv,.pnx-page.cols>.btns,.pnx-page.cols>div:not(.row2):not(.shoprow):not(.it){grid-column:1/-1}}
+`;document.head.appendChild(st)}
+const PNXM={};
+function pnxEnhance(){const p=ov.firstElementChild;ov.classList.remove('pnxon');if(!p||!p.classList||!p.classList.contains('panel')||p.classList.contains('talk')||G.mode==='title'||G.mode==='create'||ov.hidden)return;
+  const avail=ov.clientHeight-16;if(p.scrollHeight<=avail+4&&!p.querySelector('.it'))return;
+  const kids=[...p.children],head=[],foot=[];while(kids.length&&(kids[0].classList.contains('eyebrow')||kids[0].tagName==='H2'||kids[0].classList.contains('rule')))head.push(kids.shift());
+  const last=kids[kids.length-1];if(last&&(last.classList.contains('btns')||(last.tagName==='BUTTON'&&last.classList.contains('btn'))))foot.push(kids.pop());
+  const own=kids.some(k=>k.classList&&k.classList.contains('tabs'));const groups=[];let cur={n:null,nodes:[]};
+  for(const k of kids){if(!own&&k.tagName==='H3'){if(cur.nodes.length||cur.n)groups.push(cur);cur={n:k.textContent.replace(/\s*[\(·:].*$/,'').trim(),nodes:[k]};continue}cur.nodes.push(k)}if(cur.nodes.length)groups.push(cur);
+  if(groups[0]&&!groups[0].n){const only=groups[0].nodes.every(n=>n.tagName==='SMALL'||n.tagName==='P');if(only&&groups[1]){groups[1].nodes.unshift(...groups[0].nodes);groups.shift()}else groups[0].n='Geral'}
+  const title=(head.find(h=>h.tagName==='H2')||{}).textContent||'menu',mem=PNXM[title]||(PNXM[title]={t:0,s:{}});
+  p.classList.add('pnx');ov.classList.add('pnxon');p.style.maxHeight=avail+'px';
+  const body=document.createElement('div');body.className='pnx-body';let tabs=null;
+  if(groups.length>=3){tabs=document.createElement('div');tabs.className='pnx-tabs';if(mem.t>=groups.length)mem.t=0;
+    groups.forEach((gr,i)=>{const pg=document.createElement('div');pg.className='pnx-page';const many=gr.nodes.filter(n=>n.classList&&(n.classList.contains('row2')||n.classList.contains('shoprow'))).length>=4;if(many)pg.classList.add('cols');
+      gr.nodes.forEach(n=>{if(n.tagName==='H3'&&i>0&&gr.nodes.length>1)n.style.display='none';pg.appendChild(n)});pg.hidden=i!==mem.t;body.appendChild(pg);
+      const b=document.createElement('button');b.type='button';b.textContent=gr.n||'Geral';if(i===mem.t)b.className='on';b.onclick=e=>{e.stopPropagation();mem.s[mem.t]=body.scrollTop;mem.t=i;[...tabs.children].forEach((x,j)=>x.classList.toggle('on',j===i));[...body.children].forEach((x,j)=>x.hidden=j!==i);body.scrollTop=mem.s[i]||0;sfx('click')};tabs.appendChild(b)})}
+  else{const pg=document.createElement('div');pg.className='pnx-page';kids.forEach(n=>pg.appendChild(n));if(kids.filter(n=>n.classList&&(n.classList.contains('row2')||n.classList.contains('shoprow'))).length>=5)pg.classList.add('cols');body.appendChild(pg);mem.t=0}
+  p.innerHTML='';head.forEach(h=>p.appendChild(h));if(tabs)p.appendChild(tabs);p.appendChild(body);if(foot.length){const f=document.createElement('div');f.className='pnx-foot';foot.forEach(n=>f.appendChild(n));p.appendChild(f)}
+  body.scrollTop=mem.s[mem.t]||0;body.addEventListener('scroll',()=>{mem.s[mem.t]=body.scrollTop},{passive:true});
+  if(p.querySelector('.detail')&&p.querySelector('.detail').closest('.pnx-page')&&!p.querySelector('.detail').closest('.pnx-page').hidden){const d=p.querySelector('.detail');if(d.offsetTop<body.scrollTop||d.offsetTop>body.scrollTop+body.clientHeight-60)body.scrollTop=Math.max(0,d.offsetTop-40)}}
+new MutationObserver(()=>{try{pnxEnhance()}catch(e){}}).observe($('#ov'),{childList:true});
+addEventListener('resize',()=>{const p=ov.firstElementChild;if(p&&p.classList&&p.classList.contains('pnx'))p.style.maxHeight=(ov.clientHeight-16)+'px'});
 /* ---------- menus ---------- */
 const ov=$('#ov'),ctl=$('#ctl'),bE=$('#bE'),bH=$('#bH'),bag=$('#bagBtn'),mapBtn=$('#mapBtn'),skB=[0,1,2].map(i=>$('#s'+i));
 function setMode(m){G.mode=m;ov.hidden=m==='play'||m==='map';ov.className=m==='title'||m==='create'?'title':'';ctl.hidden=m!=='play';bag.hidden=m!=='play';$('#optBtn').hidden=m!=='play';$('#dBtn').hidden=m!=='play';mapBtn.hidden=!(m==='play'||m==='map');if(m!=='play'){joy.id=null;held.attack=false}}
